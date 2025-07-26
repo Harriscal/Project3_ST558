@@ -1,0 +1,24 @@
+---
+title: "Exploratory Data Analysis: BRFSS 2015 Diabetes Indicators"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This analysis uses data from the [Diabetes Health Indicators Dataset](https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset), which originates from the 2015 Behavioral Risk Factor Surveillance System (BRFSS). The dataset contains over 250,000 observations collected via a health-related telephone survey.
+
+The response variable is `Diabetes_binary`, which indicates whether the respondent has been diagnosed with diabetes (1 = Yes, 0 = No). The dataset includes a variety of behavioral and clinical health indicators, such as BMI, blood pressure, cholesterol, physical activity, and smoking status.
+
+The purpose of this EDA is to investigate key features in the data and identify potential predictors for diabetes status. We aim to build a predictive model in the next phase of the project.
+
+For this exploration, we focus on the following three variables due to their clinical relevance:
+
+- `BMI`(*Body Mass Index*): A continuous measure of body fat based on height and weight. Higher BMI is strongly associated with obesity, a major risk factor for type 2 diabetes. Investigating BMI helps evaluate how excess weight relates to diabetes prevalence.
+- `PhysActivity` (*Physical Activity*): A binary variable indicating whether the respondent engaged in physical activity during the past 30 days (1 = Yes, 0 = No). Regular activity improves insulin sensitivity and lowers diabetes risk, making it an important behavioral factor.
+- `HighBP` (*High Blood Pressure*): A binary variable (1 = Yes, 0 = No) indicating whether the respondent has ever been told they have high blood pressure. Hypertension often co-occurs with diabetes due to shared metabolic risk factors.
+
+These variables were selected based on strong support in medical literature and public health guidelines as key contributors to diabetes onset and progression. They also represent a mix of lifestyle and clinical health indicators.
+
+
+
