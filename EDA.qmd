@@ -1,7 +1,10 @@
 ---
 title: "Exploratory Data Analysis: BRFSS 2015 Diabetes Indicators"
+author: "Calista Harris"
 format: html
 editor: visual
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Introduction
@@ -19,6 +22,46 @@ For this exploration, we focus on the following three variables due to their cli
 - `HighBP` (*High Blood Pressure*): A binary variable (1 = Yes, 0 = No) indicating whether the respondent has ever been told they have high blood pressure. Hypertension often co-occurs with diabetes due to shared metabolic risk factors.
 
 These variables were selected based on strong support in medical literature and public health guidelines as key contributors to diabetes onset and progression. They also represent a mix of lifestyle and clinical health indicators.
+
+## Data
+
+The data set was imported using a relative path to ensure compatibility with reproducible workflows. It contains over 250,000 observations and 22 variables collected from the 2015 BRFSS survey. These include binary indicators for health conditions and behaviors, as well as continuous variables like BMI.
+
+We began by checking the structure of the data and confirmed that most variables are either binary or categorical, even if numerically encoded. 
+
+```{r Packages-Data}
+#| message: false
+#| warning: false
+#load require libraries 
+library(tidyverse)
+
+#read in the diabetes dataset as a tibble
+diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |> 
+  as_tibble()
+
+#check structure and dimensions of the data set
+glimpse(diabetes)
+dim(diabetes)
+
+#check for missing values within the data
+colSums(is.na(diabetes))
+
+#summarize number of unique values (helps identify categorical variables)
+sapply(diabetes, n_distinct)
+
+#convert selected binary variables to factors for easier interpretation
+diabetes <- diabetes |> 
+  mutate(
+    Diabetes_binary = factor(Diabetes_binary, labels = c("No", "Yes")),
+    HighBP = factor(HighBP, labels = c("No", "Yes")),
+    PhysActivity = factor(PhysActivity, labels = c("No", "Yes"))
+  )
+```
+
+From above, to identify which variables to treat as factors, we computed the number of unique values per column. Most variables had only two distinct values, supporting their interpretation as binary indicators. A few variables like `BMI`, `Age`, `Income`, and self-reported health (`GenHlth`, `PhysHlth`, `MentHlth`) had multiple levels and were left as numeric or ordinal as appropriate.
+
+No missing values were detected, and variable names are consistent with those provided in the Kaggle documentation. To improve interpretability during EDA, we converted the selected binary variables (`Diabetes_binary`, `HighBP`, and `PhysActivity`) used for the following analysis into factors with meaningful labels.
+
 
 
 
