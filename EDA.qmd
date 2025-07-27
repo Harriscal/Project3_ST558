@@ -17,29 +17,32 @@ The purpose of this EDA is to investigate key features in the data and identify 
 
 For this exploration, we focus on the following three variables due to their clinical relevance:
 
-- `BMI`(*Body Mass Index*): A continuous measure of body fat based on height and weight. Higher BMI is strongly associated with obesity, a major risk factor for type 2 diabetes. Investigating BMI helps evaluate how excess weight relates to diabetes prevalence.
-- `PhysActivity` (*Physical Activity*): A binary variable indicating whether the respondent engaged in physical activity during the past 30 days (1 = Yes, 0 = No). Regular activity improves insulin sensitivity and lowers diabetes risk, making it an important behavioral factor.
-- `HighBP` (*High Blood Pressure*): A binary variable (1 = Yes, 0 = No) indicating whether the respondent has ever been told they have high blood pressure. Hypertension often co-occurs with diabetes due to shared metabolic risk factors.
+-   `BMI`(*Body Mass Index*): A continuous measure of body fat based on height and weight. Higher BMI is strongly associated with obesity, a major risk factor for type 2 diabetes. Investigating BMI helps evaluate how excess weight relates to diabetes prevalence.
+-   `PhysActivity` (*Physical Activity*): A binary variable indicating whether the respondent engaged in physical activity during the past 30 days (1 = Yes, 0 = No). Regular activity improves insulin sensitivity and lowers diabetes risk, making it an important behavioral factor.
+-   `HighBP` (*High Blood Pressure*): A binary variable (1 = Yes, 0 = No) indicating whether the respondent has ever been told they have high blood pressure. Hypertension often co-occurs with diabetes due to shared metabolic risk factors.
 
 These variables were selected based on strong support in medical literature and public health guidelines as key contributors to diabetes onset and progression. They also represent a mix of lifestyle and clinical health indicators.
 
 ## Data
 
-The data set was imported using a relative path to ensure compatibility with reproducible workflows. It contains over 250,000 observations and 22 variables collected from the 2015 BRFSS survey. These include binary indicators for health conditions and behaviors, as well as continuous variables like BMI.
+The dataset was imported using a relative path to ensure compatibility with reproducible workflows. It contains over 250,000 observations and 22 variables collected from the 2015 BRFSS survey. These include binary indicators for health conditions and behaviors, as well as continuous variables like BMI.
 
-We began by checking the structure of the data and confirmed that most variables are either binary or categorical, even if numerically encoded. 
+We began by checking the structure of the data and confirmed that most variables are either binary or categorical, even if numerically encoded.
 
 ```{r Packages-Data}
 #| message: false
 #| warning: false
 #load require libraries 
 library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(scales)
 
 #read in the diabetes dataset as a tibble
 diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |> 
   as_tibble()
 
-#check structure and dimensions of the data set
+#check structure and dimensions of the dataset
 glimpse(diabetes)
 dim(diabetes)
 
@@ -62,6 +65,129 @@ From above, to identify which variables to treat as factors, we computed the num
 
 No missing values were detected, and variable names are consistent with those provided in the Kaggle documentation. To improve interpretability during EDA, we converted the selected binary variables (`Diabetes_binary`, `HighBP`, and `PhysActivity`) used for the following analysis into factors with meaningful labels.
 
+## Summarizations
+
+### Univariate Summaries
+
+```{r Univariate Summaries}
+#Diabetes_binary (response)
+diabetes |>
+  count(Diabetes_binary) |>
+  mutate(prop = n / sum(n))
+
+#BMI
+summary(diabetes$BMI)
+#BMI histogram
+diabetes |> 
+ggplot(aes(x = BMI)) +
+  geom_histogram(bins = 30, fill = "#69b3a2", color = "white") +
+  labs(title = "Distribution of BMI (Body Mass Index)",
+       x = "BMI",
+       y = "Frequency") +
+  theme_minimal()
+
+#HighBP
+diabetes |>
+  count(HighBP) |> 
+  mutate(prop = n / sum(n))
+
+#PhysActivity
+diabetes |> 
+  count(PhysActivity) |> 
+  mutate(prop = n / sum(n))
+```
+
+From the summaries:
+
+-   Diabetes Status (`Diabetes_binary`): About 13.9% of individuals reported having diabetes, while the remaining 86.1% did not. This distribution is important for model development, as the outcome is moderately imbalanced.
+-   BMI (`BMI`): The mean BMI is 28.38, with a median of 27.00. The values range from 12 to 98, with a right-skewed distribution. This suggests a considerable portion of individuals fall in the overweight or obese category.
+-   High Blood Pressure (`HighBP`): Roughly 42.9% of the sample reported having high blood pressure, while 57.1% did not. This aligns with expectations, as hypertension often co-occurs with metabolic disorders.
+-   Physical Activity (`PhysActivity`): A majority, 75.7%, reported engaging in some form of physical activity in the past 30 days. The remaining 24.3% were physically inactive, a potential risk factor for chronic disease.
+
+### Bivariate Summaries with Diabetes_binary
+
+```{r Bivariate Summaries}
+#BMI by Diabetes status
+diabetes |> 
+  group_by(Diabetes_binary) |> 
+  summarise(mean_BMI = mean(BMI), sd_BMI = sd(BMI))
+
+#boxplot: BMI by diabetes status
+diabetes |> 
+  ggplot(aes(x = Diabetes_binary, y = BMI, fill = Diabetes_binary)) +
+  geom_boxplot(outlier.shape = 1, outlier.color = "black") +
+  scale_fill_manual(values = c("red", "blue")) +
+  labs(title = "BMI Distribution by Diabetes Status",
+       x = "Diabetes Diagnosis", y = "BMI") +
+  theme_minimal() +
+  theme(legend.position = "none")
 
 
+#bar plots: Diabetes status vs each categorical predictor
+
+#proportion of Diabetes by HighBP
+
+#reorder factor + sort data so "Yes" (blue) is on bottom and "No" (red) on top
+prop_highbp <- diabetes |>
+  count(HighBP, Diabetes_binary) |>
+  group_by(HighBP) |>
+  arrange(HighBP, Diabetes_binary) |>
+  mutate(
+    prop = n / sum(n),
+    label_pos = percent(prop, accuracy = 0.1)
+  )
+
+#plot with centered percent labels in the right box
+prop_highbp |> 
+  ggplot(aes(x = HighBP, y = prop, fill = Diabetes_binary)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = label_pos),
+            position = position_stack(vjust = 0.5),
+            size = 3, color = "white", fontface = "bold") +
+  scale_fill_manual(values = c("Yes" = "blue", "No" = "red"),
+                    name = "Diabetes Status") +
+  labs(title = "Proportion of Diabetes by High Blood Pressure",
+       y = "Proportion", x = "High Blood Pressure Status") +
+  theme_minimal()
+
+
+#proportion of Diabetes by Physical Activity
+
+#reorder factor + sort data so "Yes" (blue) is on bottom and "No" (red) on top
+prop_pa <- diabetes |>
+  count(PhysActivity, Diabetes_binary) |>
+  group_by(PhysActivity) |>
+  arrange(PhysActivity, Diabetes_binary) |>
+  mutate(
+    prop = n / sum(n),
+    label_pos = percent(prop, accuracy = 0.1)
+  )
+
+prop_pa |> 
+  ggplot(aes(x = PhysActivity, y = prop, fill = Diabetes_binary)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = label_pos),
+            position = position_stack(vjust = 0.5),
+            size = 3, color = "white", fontface = "bold") +
+  scale_fill_manual(values = c("Yes" = "blue", "No" = "red"),
+                    name = "Diabetes Status") +
+  labs(title = "Proportion of Diabetes by Physical Activity",
+       y = "Proportion", x = "Physical Activity in Past 30 Days") +
+  theme_minimal()
+```
+
+From the summaries:
+
+-   BMI by Diabetes Status: Individuals with diabetes have a higher average BMI, 31.9, than those without diabetes, 27.8.This supports the observed positive relationship between body weight and diabetes.
+
+-   Proportion of Diabetes by High Blood Pressure: Among individuals with high blood pressure,24.4% have diabetes. In contrast, only 6.0% of those without high blood pressure have diabetes. This highlights a strong positive association between hypertension and diabetes risk.
+
+-   Proportion of Diabetes by Physical Activity: Only 11.6% of individuals who reported physical activity had diabetes, compared to 21.1% among those who were inactive. This suggests a potential protective effect of regular activity against diabetes onset.
+
+
+## Next Steps
+
+Having explored the univariate distributions and bivariate relationships between predictors and diabetes status, we now proceed to develop predictive models using these variables.
+
+👉 [Click here to continue to the Modeling page](Modeling.html)
 
