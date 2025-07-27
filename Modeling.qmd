@@ -2,6 +2,8 @@
 title: "Predictive Modeling of Diabetes Status Using Health Indicators"
 format: html
 editor: visual
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Introduction
@@ -10,7 +12,7 @@ In this section, we develop classification models to predict whether an individu
 
 Based on insights from the exploratory analysis, we focus on predictors such as `BMI`(Body Mass Index), `PhysActivty` (Physical Activity), and `HighBP` (High Blood Pressure). We will evaluate three types of models: logistic regression, classification trees, and random forests.
 
-All models are fit using the *`caret`* package in R. Model performance is assessed using *log loss* as the primary evaluation metric, with *5-fold cross-validation* applied to select the best configuration within each model type. Final comparisons will be made on a held-out test set.
+All models are fit using the `caret` package in R. Model performance is assessed using *log loss* as the primary evaluation metric, with *5-fold cross-validation* applied to select the best configuration within each model type. Final comparisons will be made on a held-out test set.
 
 ## Data Splitting
 
@@ -18,11 +20,11 @@ All models are fit using the *`caret`* package in R. Model performance is assess
 #| message: false
 #| warning: false
 #load require libraries 
+library(readr)
 library(rsample)
 library(caret)
 library(dplyr)
 library(yardstick)
-library(readr)
 
 #read in data again (same as EDA.qmd)
 diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |>
@@ -41,3 +43,106 @@ split <- initial_split(diabetes, prop = 0.7, strata = Diabetes_binary)
 train_data <- training(split)
 test_data <- testing(split)
 ```
+
+## Logistic Regression Models
+
+Logistic regression is a classification method used when the response variable is binary. Instead of modeling the response directly, logistic regression models the *log-odds* (also called the logit) of the outcome as a linear combination of the predictors:
+
+$$\log\left(\frac{P(Y = 1)}{1 - P(Y = 1)}\right) = \beta_0 + \beta_1 X_1 + \cdots + \beta_p X_p$$
+
+This ensures that the predicted probabilities always lie between 0 and 1, which is a key property when modeling binary outcomes. In this analysis, the response variable is `Diabetes_binary`, which indicates whether or not an individual has diabetes (Yes or No), making logistic regression a natural and interpretable choice.
+
+We use the `caret` package to fit three candidate logistic regression models using different sets of predictors identified during exploratory analysis. Each model is evaluated using *5-fold cross-validation* with *log loss* as the performance metric. Log loss penalizes incorrect predictions more severely when the model is overconfident, making it especially appropriate when evaluating predicted probabilities rather than simple classifications.
+
+The three logistic regression models we fit are:
+
+- *Model 1:* BMI only  
+- *Model 2:* BMI and High Blood Pressure  
+- *Model 3:* BMI, High Blood Pressure, and Physical Activity  
+
+All models are fit using `caret::train()` with `method = "glm"` (for standard logistic regression) and `family = binomial`. The model with the *lowest average log loss* across the cross-validation folds is selected as the best model to carry forward.
+
+
+```{r LRM Step 1: Setup for caret}
+#define trainControl object for 5-fold CV + log loss
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = mnLogLoss
+)
+```
+
+```{r LRM Step 2: Define 3 logistic regression models}
+#model 1: BMI only
+log_model1 <- train(
+  Diabetes_binary ~ BMI,
+  data = train_data,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl,
+  metric = "logLoss"
+)
+
+#model 2: BMI + HighBP
+log_model2 <- train(
+  Diabetes_binary ~ BMI + HighBP,
+  data = train_data,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl,
+  metric = "logLoss"
+)
+
+#model 3: BMI + HighBP + PhysActivity
+log_model3 <- train(
+  Diabetes_binary ~ BMI + HighBP + PhysActivity,
+  data = train_data,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl,
+  metric = "logLoss"
+)
+```
+
+```{r LRM Step 3: Compare Models (Log Loss)}
+#display results in a data frame
+model_results <- data.frame(
+  Model = c("Model 1: BMI",
+            "Model 2: BMI + HighBP",
+            "Model 3: BMI + HighBP + PhysActivity"),
+  LogLoss = c(
+    min(log_model1$results$logLoss),
+    min(log_model2$results$logLoss),
+    min(log_model3$results$logLoss)
+  )
+)
+
+model_results
+```
+
+The table above summarizes the log loss values for each of the three logistic regression models fit using 5-fold cross-validation.
+
+- *Model 1*, which includes only `BMI` as a predictor, has the highest log loss (0.384), indicating weaker performance.
+- *Model 2*, which adds `HighBP` to the model, improves prediction substantially, reducing the log loss to 0.357.
+- *Model 3*, which includes `BMI`, `HighBP`, and `PhysActivity`, achieves the *lowest log loss* (0.354), suggesting it has the best predictive accuracy of the three.
+
+Thus, *Model 3* is selected as the best logistic regression model and will be retained for comparison against other model types (e.g., trees and random forests).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
