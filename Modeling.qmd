@@ -1,0 +1,43 @@
+---
+title: "Predictive Modeling of Diabetes Status Using Health Indicators"
+format: html
+editor: visual
+---
+
+## Introduction
+
+In this section, we develop classification models to predict whether an individual has diabetes (`Diabetes_binary`) using health-related predictors from the 2015 BRFSS dataset.
+
+Based on insights from the exploratory analysis, we focus on predictors such as `BMI`(Body Mass Index), `PhysActivty` (Physical Activity), and `HighBP` (High Blood Pressure). We will evaluate three types of models: logistic regression, classification trees, and random forests.
+
+All models are fit using the *`caret`* package in R. Model performance is assessed using *log loss* as the primary evaluation metric, with *5-fold cross-validation* applied to select the best configuration within each model type. Final comparisons will be made on a held-out test set.
+
+## Data Splitting
+
+```{r Data Splitting}
+#| message: false
+#| warning: false
+#load require libraries 
+library(rsample)
+library(caret)
+library(dplyr)
+library(yardstick)
+library(readr)
+
+#read in data again (same as EDA.qmd)
+diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |>
+  as_tibble() |>
+  mutate(
+    Diabetes_binary = factor(Diabetes_binary, labels = c("No", "Yes")),
+    HighBP = factor(HighBP, labels = c("No", "Yes")),
+    PhysActivity = factor(PhysActivity, labels = c("No", "Yes"))
+  )
+
+#set seed for reproducibility
+set.seed(101)
+
+#split data: 70% training, 30% testing
+split <- initial_split(diabetes, prop = 0.7, strata = Diabetes_binary)
+train_data <- training(split)
+test_data <- testing(split)
+```
