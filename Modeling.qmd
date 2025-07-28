@@ -27,6 +27,9 @@ library(dplyr)
 library(yardstick)
 library(rpart)
 library(rpart.plot)
+library(randomForest)
+library(ranger)
+
 
 #read in data again (same as EDA.qmd)
 diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |>
@@ -58,12 +61,11 @@ We use the `caret` package to fit three candidate logistic regression models usi
 
 The three logistic regression models we fit are:
 
-- *Model 1:* BMI only  
-- *Model 2:* BMI and High Blood Pressure  
-- *Model 3:* BMI, High Blood Pressure, and Physical Activity  
+-   *Model 1:* BMI only\
+-   *Model 2:* BMI and High Blood Pressure\
+-   *Model 3:* BMI, High Blood Pressure, and Physical Activity
 
 All models are fit using `caret::train()` with `method = "glm"` (for standard logistic regression) and `family = binomial`. The model with the *lowest average log loss* across the cross-validation folds is selected as the best model to carry forward.
-
 
 ```{r LRM Step 1: Setup for caret}
 #define trainControl object for 5-fold CV + log loss
@@ -125,9 +127,9 @@ model_results
 
 The table above summarizes the log loss values for each of the three logistic regression models fit using 5-fold cross-validation.
 
-- *Model 1*, which includes only `BMI` as a predictor, has the highest log loss (0.384), indicating weaker performance.
-- *Model 2*, which adds `HighBP` to the model, improves prediction substantially, reducing the log loss to 0.357.
-- *Model 3*, which includes `BMI`, `HighBP`, and `PhysActivity`, achieves the *lowest log loss* (0.354), suggesting it has the best predictive accuracy of the three.
+-   *Model 1*, which includes only `BMI` as a predictor, has the highest log loss (0.384), indicating weaker performance.
+-   *Model 2*, which adds `HighBP` to the model, improves prediction substantially, reducing the log loss to 0.357.
+-   *Model 3*, which includes `BMI`, `HighBP`, and `PhysActivity`, achieves the *lowest log loss* (0.354), suggesting it has the best predictive accuracy of the three.
 
 Thus, *Model 3* is selected as the best logistic regression model and will be retained for comparison against other model types (e.g., trees and random forests).
 
@@ -185,18 +187,54 @@ The tuning grid of complexity parameters (cp values) did not affect the model pe
 
 While classification trees are known for being interpretable and modeling interactions well, they can struggle with imbalanced data or when the splits do not provide sufficient gain under the loss function. This outcome suggests that classification trees may not be the best standalone model for this dataset, though they can still be useful within ensemble methods like random forests.
 
+## Random Forest
 
+Random Forest is an ensemble learning method that builds on the foundation of classification trees. Rather than fitting a single decision tree, a random forest grows many decision trees using random subsets of the data and predictors, and then averages their predictions (for regression) or takes a majority vote (for classification).
 
+This approach helps address some of the major weaknesses of a single tree:
 
+-   Trees are high variance models; a small change in the data can lead to a completely different tree.
 
+-   Trees can easily overfit, especially if grown deep.
 
+-   Random Forests mitigate this by averaging results across multiple trees, improving predictive accuracy and stability.
 
+We also introduce randomness at each tree split (by selecting a random subset of predictors) which helps decorrelate the trees. This improves ensemble performance and is especially useful when predictors are correlated.
 
+Given that our classification tree failed to split when using log-loss, a Random Forest may do better by combining many weak learners. We'll continue using log-loss and 5-fold cross-validation with the `caret` package, and will tune the number of variables (`mtry`) tried at each split.
 
+```{r Random Forest}
+#define the tuning grid for the ranger random forest model
+rf_grid <- expand.grid(
+  mtry = c(1, 2, 3),          #number of predictors considered at each split
+  splitrule = "gini",        #use Gini impurity for classification (default)
+  min.node.size = 10         #minimum number of observations in a terminal node (larger = faster)
+)
 
+#set seed for reproducibility
+set.seed(101)
 
+#train the random forest model using caret and ranger
+rf_model <- train(
+  Diabetes_binary ~ BMI + HighBP + PhysActivity,  #model formula
+  data = train_data,                              #training data only
+  method = "ranger",                              #use ranger implementation
+  tuneGrid = rf_grid,                             #custom grid of tuning parameters
+  metric = "logLoss",                             #evaluation metric for model performance
+  maximize = FALSE,                               #minimize log-loss
+  trControl = trainControl(
+    method = "cv",                                #use cross-validation
+    number = 5,                                   #5-fold CV
+    classProbs = TRUE,                            #enable class probabilities for logLoss
+    summaryFunction = mnLogLoss                   #specify custom summary function
+  ),
+  num.trees = 100                                 #reduce number of trees for faster training
+)
 
+#view cross-validation results for each combination of tuning parameters
+rf_model$results
+```
 
+From above, the `ranger` engine was used from the `caret` package and trained models using 5-fold cross-validation. The log-loss metric was used to evaluate model performance. We set up a tuning grid for the number of predictors sampled at each split (`mtry`), using values from 1 to 3, since the model includes 3 total predictors.
 
-
-
+Although `mtry = 2` had the lowest log-loss, its standard deviation was slightly higher than the others. Still, all models performed similarly, and `mtry = 2` was selected for the final model due to its superior average performance.
