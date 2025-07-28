@@ -25,6 +25,8 @@ library(rsample)
 library(caret)
 library(dplyr)
 library(yardstick)
+library(rpart)
+library(rpart.plot)
 
 #read in data again (same as EDA.qmd)
 diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |>
@@ -36,7 +38,7 @@ diabetes <- read_csv("data/diabetes_binary_health_indicators_BRFSS2015.csv") |>
   )
 
 #set seed for reproducibility
-set.seed(101)
+set.seed(123)
 
 #split data: 70% training, 30% testing
 split <- initial_split(diabetes, prop = 0.7, strata = Diabetes_binary)
@@ -129,7 +131,59 @@ The table above summarizes the log loss values for each of the three logistic re
 
 Thus, *Model 3* is selected as the best logistic regression model and will be retained for comparison against other model types (e.g., trees and random forests).
 
+## Classification Tree Models
 
+Classification trees are non-linear models that predict a categorical outcome by recursively splitting the predictor space into distinct and homogeneous regions. At each step, the algorithm chooses a predictor and a split point that maximizes class separation (typically using measures like Gini impurity or entropy). The result is a flowchart-like structure where observations are classified based on a sequence of decision rules.
+
+Trees are appealing because they are easy to interpret and can naturally handle interactions between variables and non-linear relationships. They also do not require assumptions about the distribution of predictors. However, they can be prone to *overfitting*, which is why pruning the tree (via a complexity parameter, `cp`) is essential.
+
+In this analysis, we fit a *classification tree* using the `rpart` method in the `caret` package. We tune the *complexity parameter (cp)* using 5-fold cross-validation and select the model that minimizes *log loss*. The predictors used in the tree are the same as in the best logistic regression model: BMI, High Blood Pressure, and Physical Activity.
+
+```{r CTM}
+#set up 5-fold CV with log loss
+ctrl_tree <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = mnLogLoss
+)
+
+#grid of complexity parameter (cp) values to test
+grid_tree <- expand.grid(cp = seq(0.001, 0.05, by = 0.005))
+
+#fit classification tree model
+set.seed(101)
+tree_model <- train(
+  Diabetes_binary ~ BMI + HighBP + PhysActivity,
+  data = train_data,
+  method = "rpart",
+  trControl = ctrl_tree,
+  metric = "logLoss",
+  tuneGrid = grid_tree
+)
+
+# View results
+tree_model$results
+```
+
+```{r CTM: Plot Best Classification Tree}
+#extract the final tree model from caret object
+final_tree <- tree_model$finalModel
+
+#plot the tree
+rpart.plot(final_tree,
+           type = 2,         #type 2 = label all nodes
+           extra = 104,      #shows fitted class + probability + % of obs
+           under = TRUE,     #labels under the box
+           faclen = 0,       #use full names for factor levels
+           main = "Final Classification Tree for Predicting Diabetes")
+```
+
+The final classification tree plot above reveals that the model did not split the data at all. where it predicts every observation as "No" for diabetes. This outcome is likely due to the strong class imbalance in the training data, where about 86% of observations are non-diabetic.
+
+The tuning grid of complexity parameters (cp values) did not affect the model performance, with all configurations resulting in the same log loss of approximately 0.4038. Since no split improved the log loss metric meaningfully, the algorithm defaulted to a root-only tree.
+
+While classification trees are known for being interpretable and modeling interactions well, they can struggle with imbalanced data or when the splits do not provide sufficient gain under the loss function. This outcome suggests that classification trees may not be the best standalone model for this dataset, though they can still be useful within ensemble methods like random forests.
 
 
 
