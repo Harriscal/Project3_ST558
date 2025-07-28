@@ -282,6 +282,9 @@ results <- tibble(
 )
 
 results
+
+#need to save the final model for the API.R file
+saveRDS(tree_model, file = "final_model.rds")
 ```
 
 Despite being the simplest in structure, the Classification Tree achieved the lowest log-loss on the test set. While the tree did not perform splits during training due to lack of signal under cross-validation, it surprisingly generalized better than both logistic regression and random forest in this case.

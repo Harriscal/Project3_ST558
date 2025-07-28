@@ -444,6 +444,8 @@ window.Quarto = {
 2 Classification Tree    2.22
 3 Random Forest          2.51</code></pre>
 </div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co">#need to save the final model for the API.R file</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(tree_model, <span class="at">file =</span> <span class="st">"final_model.rds"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Despite being the simplest in structure, the Classification Tree achieved the lowest log-loss on the test set. While the tree did not perform splits during training due to lack of signal under cross-validation, it surprisingly generalized better than both logistic regression and random forest in this case.</p>
 <p>This outcome highlights an important modeling lesson: more complex models do not always lead to better predictions, especially when the predictive signal is weak or the dataset is imbalanced. The classification tree model likely benefitted from conservative predictions that aligned well with the distribution of the test set.</p>
