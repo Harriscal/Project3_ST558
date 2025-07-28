@@ -29,6 +29,7 @@ library(rpart)
 library(rpart.plot)
 library(randomForest)
 library(ranger)
+library(ModelMetrics)
 
 
 #read in data again (same as EDA.qmd)
@@ -187,6 +188,11 @@ The tuning grid of complexity parameters (cp values) did not affect the model pe
 
 While classification trees are known for being interpretable and modeling interactions well, they can struggle with imbalanced data or when the splits do not provide sufficient gain under the loss function. This outcome suggests that classification trees may not be the best standalone model for this dataset, though they can still be useful within ensemble methods like random forests.
 
+The final classification tree was fit using the formula:
+
+$$Diabetes\_binary ∼ BMI + HighBP + PhysActivity $$
+This model included all three predictors identified during the earlier modeling process. However, cross-validation using log-loss as the performance metric revealed that none of the potential splits offered a meaningful improvement. As a result, the optimal tree did not split at all, leading to a very simple stump model that predicts the majority class ("No") for all cases. This outcome is reflected in the tree plot and highlights one limitation of basic classification trees: they are prone to underfitting when signal is weak or thresholds are strict.
+
 ## Random Forest
 
 Random Forest is an ensemble learning method that builds on the foundation of classification trees. Rather than fitting a single decision tree, a random forest grows many decision trees using random subsets of the data and predictors, and then averages their predictions (for regression) or takes a majority vote (for classification).
@@ -206,7 +212,7 @@ Given that our classification tree failed to split when using log-loss, a Random
 ```{r Random Forest}
 #define the tuning grid for the ranger random forest model
 rf_grid <- expand.grid(
-  mtry = c(1, 2, 3),          #number of predictors considered at each split
+  mtry = c(1, 2, 3),         #number of predictors considered at each split
   splitrule = "gini",        #use Gini impurity for classification (default)
   min.node.size = 10         #minimum number of observations in a terminal node (larger = faster)
 )
@@ -238,3 +244,63 @@ rf_model$results
 From above, the `ranger` engine was used from the `caret` package and trained models using 5-fold cross-validation. The log-loss metric was used to evaluate model performance. We set up a tuning grid for the number of predictors sampled at each split (`mtry`), using values from 1 to 3, since the model includes 3 total predictors.
 
 Although `mtry = 2` had the lowest log-loss, its standard deviation was slightly higher than the others. Still, all models performed similarly, and `mtry = 2` was selected for the final model due to its superior average performance.
+
+The final random forest model was also built using:
+
+$$Diabetes\_binary ∼ BMI + HighBP + PhysActivity $$
+
+The model was trained using the ranger method with 5-fold cross-validation and log-loss as the performance metric. To improve speed during rendering, we reduced the number of trees to 100 and limited the tuning grid to a few key values for mtry. Despite its complexity and ensemble structure, the model's performance on the test set was not superior to the simpler models, which is not uncommon in low-signal or imbalanced classification tasks.
+
+## Final Model Selection
+
+Now that we’ve trained and tuned three different model types; logistic regression, classification tree, and random forest. Using cross-validation on the training set, we shift our focus to evaluating their performance on the test set. The ultimate goal is to determine which model best generalizes to new, unseen data.
+
+Each of the three models was trained using the same set of predictors: BMI, HighBP, and PhysActivity. This allowed for a fair comparison of the modeling approaches themselves while holding the input features constant.
+
+To evaluate generalization performance, each model was assessed on the held-out test set using log-loss, which penalizes incorrect and overconfident predictions more heavily than accuracy. The results are summarized below:
+
+
+```{r Final Model Selection: Compare Models}
+#make predictions and evaluate on test set
+
+#logistic Regression (best model was: BMI + HighBP + PhysActivity)
+log_pred <- predict(log_model3, newdata = test_data, type = "prob")[, "Yes"]
+log_loss_log <- logLoss(actual = test_data$Diabetes_binary, predicted = log_pred)
+
+#classification Tree
+tree_pred <- predict(tree_model, newdata = test_data, type = "prob")[, "Yes"]
+log_loss_tree <- logLoss(actual = test_data$Diabetes_binary, predicted = tree_pred)
+
+#random Forest
+rf_pred <- predict(rf_model, newdata = test_data, type = "prob")[, "Yes"]
+log_loss_rf <- logLoss(actual = test_data$Diabetes_binary, predicted = rf_pred)
+
+#combine and display results
+results <- tibble(
+  Model = c("Logistic Regression", "Classification Tree", "Random Forest"),
+  LogLoss = c(log_loss_log, log_loss_tree, log_loss_rf)
+)
+
+results
+```
+
+Despite being the simplest in structure, the Classification Tree achieved the lowest log-loss on the test set. While the tree did not perform splits during training due to lack of signal under cross-validation, it surprisingly generalized better than both logistic regression and random forest in this case.
+
+This outcome highlights an important modeling lesson: more complex models do not always lead to better predictions, especially when the predictive signal is weak or the dataset is imbalanced. The classification tree model likely benefitted from conservative predictions that aligned well with the distribution of the test set.
+
+Therefore, we select the Classification Tree as the final model for predicting diabetes status in this dataset.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
