@@ -1,63 +1,63 @@
-# plumber.R
+# plumber API - Diabetes Prediction (Classification Tree Model)
 
 #* @apiTitle Diabetes Prediction API
-#* @apiDescription This API predicts the probability that a patient has diabetes based on three health indicators: Body Mass Index (BMI), high blood pressure status, and recent physical activity. The underlying model is a logistic regression trained on a large public health dataset.
-#* @apiVersion 1.0.0
+#* @apiDescription This API predicts the probability that a patient has diabetes based on three health indicators: Body Mass Index (BMI), high blood pressure status, and recent physical activity. The underlying model is a classification tree trained on a large public health dataset.
 
-# Load necessary packages
+# Load required packages
 library(plumber)
 library(tibble)
-library(caret)
+library(rpart)
+library(rpart.plot)
 
-# Read in the final trained model (must be present in root directory)
+# Read in the final classification tree model
 final_model <- readRDS("final_model.rds")
 
 #* Return project information
 #* @get /info
-#* @response 200 Returns metadata about the API and project
 function() {
   list(
     project = "Diabetes Prediction API",
     author = "Calista Harris",
-    site = "https://github.com/Harriscal/Project3_ST558",
     version = "1.0.0",
-    date = as.character(Sys.Date()),
-    description = "Predicts diabetes using a classification tree model trained on BMI, HighBP, and PhysActivity."
+    date = Sys.Date(),
+    site = "https://harriscal.github.io/Project3_ST558/"
   )
 }
 
 #* Predict diabetes based on input values (Classification Tree Model)
-#* @param BMI:number Body Mass Index (e.g., 28.0)
-#* @param HighBP:string Indicator for High Blood Pressure: 'Yes' or 'No'
-#* @param PhysActivity:string Indicator for Physical Activity in past 30 days: 'Yes' or 'No'
+#* @param BMI:double Body Mass Index (default = 28)
+#* @param HighBP:string High blood pressure status ("Yes" or "No", default = "No")
+#* @param PhysActivity:string Physical activity status ("Yes" or "No", default = "Yes")
 #* @get /predict_diabetes
-#* @response 200 Returns predicted probability of diabetes
-#* @response 400 Invalid input provided
-function(BMI, HighBP = "No", PhysActivity = "Yes") {
-  # Validate and convert input
-  BMI <- as.numeric(BMI)
-  if (is.na(BMI) || BMI <= 0) {
+function(BMI = 28, HighBP = "No", PhysActivity = "Yes") {
+  
+  # Input validation
+  if (!is.numeric(as.numeric(BMI)) || as.numeric(BMI) <= 0) {
     return(list(error = "BMI must be a positive numeric value."))
   }
-  
-  if (!HighBP %in% c("Yes", "No")) {
-    return(list(error = "HighBP must be either 'Yes' or 'No'."))
+  if (!(HighBP %in% c("Yes", "No"))) {
+    return(list(error = "HighBP must be 'Yes' or 'No'."))
+  }
+  if (!(PhysActivity %in% c("Yes", "No"))) {
+    return(list(error = "PhysActivity must be 'Yes' or 'No'."))
   }
   
-  if (!PhysActivity %in% c("Yes", "No")) {
-    return(list(error = "PhysActivity must be either 'Yes' or 'No'."))
-  }
-  
-  # Create input dataframe
-  new_data <- tibble(
-    BMI = BMI,
+  # Construct input tibble (matching factor levels used in training)
+  new_obs <- tibble(
+    BMI = as.numeric(BMI),
     HighBP = factor(HighBP, levels = c("No", "Yes")),
     PhysActivity = factor(PhysActivity, levels = c("No", "Yes"))
   )
   
-  # Predict probability
-  prob <- predict(final_model, newdata = new_data, type = "prob")[, "Yes"]
+  # Make prediction using classification tree
+  prob <- predict(final_model, newdata = new_obs, type = "prob")[, "Yes"]
   
-  # Return prediction
+  # Return result
   list(prob_diabetes = round(prob, 4))
 }
+
+# -------------------------------
+# Example calls:
+# GET /predict_diabetes?BMI=30&HighBP=Yes&PhysActivity=No
+# curl "http://127.0.0.1:8000/predict_diabetes?BMI=28&HighBP=No&PhysActivity=Yes"
+# R: httr::GET("http://127.0.0.1:8000/predict_diabetes?BMI=27&HighBP=Yes&PhysActivity=Yes")

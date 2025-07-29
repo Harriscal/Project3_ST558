@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.git
+.quarto
+docs
+*.qmd
+*.Rproj
+README.md
+LICENSE
